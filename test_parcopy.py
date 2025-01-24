@@ -1,3 +1,4 @@
+import unittest
 import parcopy1
 import parcopy2
 
@@ -54,41 +55,46 @@ test_cases = [
     ),
 ]
 
-for inp, exp in test_cases:
-    print("i:", inp)
-    r1 = parcopy1.sequentialize(inp)
-    r2 = parcopy2.sequentialize(inp)
-    print("#", r1)
-    assert r1 == r2
-    assert r1 == exp
-    print()
+
+class ParCopyTests(unittest.TestCase):
+    def test_sequentialize(self) -> None:
+        for inp, exp in test_cases:
+            for seq_func in (parcopy1.sequentialize, parcopy2.sequentialize):
+                with self.subTest(seq_func=seq_func, inp=inp, exp=exp):
+                    self.assertEqual(seq_func(inp), exp)
+
+    def test_dup_dest_raises(self) -> None:
+        for seq_func in (parcopy1.sequentialize, parcopy2.sequentialize):
+            with self.subTest(seq_func=seq_func):
+                with self.assertRaises(ValueError):
+                    seq_func([("a", "b"), ("b", "c"), ("b", "a")])
+
+    def test_dup_dest(self) -> None:
+        for seq_func in (parcopy1.sequentialize, parcopy2.sequentialize):
+            with self.subTest(seq_func=seq_func):
+                result = seq_func([("a", "b"), ("b", "c"), ("b", "a")], filter_dup_dests=True)
+                self.assertEqual(result, [("tmp", "b"), ("b", "a"), ("a", "tmp")])
+
+    def test_fan_out(self) -> None:
+        fan_out_cases = [
+            CASE(
+                [("b", "a"), ("c", "a")],
+                [("c", "a"), ("b", "c")]
+            ),
+            CASE(
+                [("a", "d"), ("b", "a"), ("c", "a"), ("d", "c")],
+                [("b", "a"), ("a", "d"), ("d", "c"), ("c", "b")]
+            ),
+            CASE(
+                [("b", "a"), ("c", "b"), ("a", "c"), ("d", "c")],
+                [("d", "c"), ("c", "b"), ("b", "a"), ("a", "d")]
+            ),
+        ]
+        for inp, exp in fan_out_cases:
+            for seq_func in (parcopy1.sequentialize, parcopy2.sequentialize):
+                with self.subTest(seq_func=seq_func, inp=inp, exp=exp):
+                    self.assertEqual(seq_func(inp), exp)
 
 
-def dup_dest(seq_func):
-    try:
-        seq_func([("a", "b"), ("b", "c"), ("b", "a")])
-        assert 0, "Expected exception"
-    except ValueError:
-        pass
-
-    r = seq_func([("a", "b"), ("b", "c"), ("b", "a")], filter_dup_dests=True)
-    assert r == [("tmp", "b"), ("b", "a"), ("a", "tmp")]
-
-
-dup_dest(parcopy1.sequentialize)
-dup_dest(parcopy2.sequentialize)
-
-
-def fan_out(seq_func):
-    r = seq_func([("b", "a"), ("c", "a")])
-    assert r == [("c", "a"), ("b", "c")]
-
-    r = seq_func([("a", "d"), ("b", "a"), ("c", "a"), ("d", "c")])
-    assert r == [("b", "a"), ("a", "d"), ("d", "c"), ("c", "b")]
-
-    r = seq_func([("b", "a"), ("c", "b"), ("a", "c"), ("d", "c")])
-    assert r == [("d", "c"), ("c", "b"), ("b", "a"), ("a", "d")]
-
-
-fan_out(parcopy1.sequentialize)
-fan_out(parcopy2.sequentialize)
+if __name__ == "__main__":
+    unittest.main()
